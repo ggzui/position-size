@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { calculatePosition } from './calculator.js';
 import { parsePastedPrice } from './price.js';
-import { formatResultValue } from './format.js';
+import { formatQuantity, formatResultValue } from './format.js';
 
 const example = { balance: '10000', risk: '4', leverage: '10', entry: '65000', stop: '63000', target: '71000', direction: 'long' };
 const leverageOptions = ['1', '2', '3', '5', '10', '20', '25', '50', '75', '100'];
@@ -116,7 +116,7 @@ export default function App() {
 
   async function copyResult() {
     try {
-      await navigator.clipboard.writeText(`${values.direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatResultValue(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
+      await navigator.clipboard.writeText(`${values.direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
       setCopyState('已复制');
     } catch { setCopyState('复制失败，请手动选择结果'); }
   }
@@ -162,11 +162,11 @@ export default function App() {
           <div className="result-card">
             <div className="result-topline"><span><span className="live-dot" />你的仓位计划</span><span className="result-leverage">{values.leverage}x 杠杆</span></div>
             <p className="quantity-label">合约数量</p>
-            <div className="quantity" aria-live="polite" aria-atomic="true">{result ? number(result.quantity, 6) : '—'}<span>单位</span></div>
-            <div className="notional">仓位大小 <strong>{result ? number(result.notional) : '—'} <span>USDT</span></strong></div>
-            <div className="notional">预计保证金 <strong>{result ? number(result.margin) : '—'} <span>USDT</span></strong></div>
+            <div className="quantity" aria-live="polite" aria-atomic="true">{result ? formatQuantity(result.quantity) : '—'}<span>单位</span></div>
+            <div className="notional">仓位大小 <strong>{result ? formatResultValue(result.notional) : '—'} <span>USDT</span></strong></div>
+            <div className="notional">预计保证金 <strong>{result ? formatResultValue(result.margin) : '—'} <span>USDT</span></strong></div>
             <div className="result-divider" />
-            <div className="capital-label"><span>保证金比率</span><strong>{result ? number(result.marginUsage, 1) : '—'}%</strong></div>
+            <div className="capital-label"><span>保证金比率</span><strong>{result ? formatResultValue(result.marginUsage) : '—'}%</strong></div>
             <div className="capital-bar"><span style={{ width: `${Math.min(result?.marginUsage ?? 0, 100)}%` }} /></div>
             <div className="result-bottom"><Icon name="shield" size={15} /><span>{result ? `风险预算为账户资金的 ${number(Number(values.risk))}%` : '请先填写有效的交易参数'}</span></div>
           </div>
@@ -182,7 +182,7 @@ export default function App() {
 
       <div className="below-grid">
         <PlanChart values={values} result={result} />
-        <section className="explanation card" id="how-it-works" aria-labelledby="formula-title"><div className="section-heading"><h2 id="formula-title">简单的公式，清晰的决策</h2><Icon name="info" size={17} /></div><p>用你能承担的风险，反推合约数量。</p><div className="formula"><span>合约数量</span><b>=</b><div><span>账户资金 × 风险比例</span><hr /><span>| 入场价格 − 止损价格 |</span></div></div><div className="formula-example">代入当前参数<span>{result ? `${number(Number(values.balance))} × ${number(Number(values.risk))}% ÷ ${number(Math.abs(Number(values.entry) - Number(values.stop)))}` : '等待有效参数'}<b>{result ? `= ${number(result.quantity, 6)} 单位` : '—'}</b></span></div><p className="margin-formula">预计保证金 = 仓位大小 ÷ 杠杆倍数</p><a className="learn-link" href="https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size" target="_blank" rel="noreferrer">了解仓位与风险的关系<Icon name="up" size={15} /></a></section>
+        <section className="explanation card" id="how-it-works" aria-labelledby="formula-title"><div className="section-heading"><h2 id="formula-title">简单的公式，清晰的决策</h2><Icon name="info" size={17} /></div><p>用你能承担的风险，反推合约数量。</p><div className="formula"><span>合约数量</span><b>=</b><div><span>账户资金 × 风险比例</span><hr /><span>| 入场价格 − 止损价格 |</span></div></div><div className="formula-example">代入当前参数<span>{result ? `${number(Number(values.balance))} × ${number(Number(values.risk))}% ÷ ${number(Math.abs(Number(values.entry) - Number(values.stop)))}` : '等待有效参数'}<b>{result ? `= ${formatQuantity(result.quantity)} 单位` : '—'}</b></span></div><p className="margin-formula">预计保证金 = 仓位大小 ÷ 杠杆倍数</p><a className="learn-link" href="https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size" target="_blank" rel="noreferrer">了解仓位与风险的关系<Icon name="up" size={15} /></a></section>
       </div>
 
       <div className="calculation-note"><Icon name="info" size={16} /><p>适用于数量 × 价格的线性计价，保证金按入场价估算；未计手续费、滑点、数量步长及维持保证金，不计算强平。切换多空时，止损与止盈会按原价差镜像调整。</p></div>
