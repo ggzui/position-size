@@ -13,17 +13,13 @@ export function calculatePosition(values) {
 
   if (numbers.risk > 100) errors.risk = '单笔风险不能超过 100%';
   if (errors.leverage || numbers.leverage < 1) errors.leverage = '请输入不小于 1 的有效杠杆倍数';
-  if (!['long', 'short'].includes(values.direction)) errors.direction = '请选择做多或做空';
-
-  if (!errors.entry && !errors.stop) {
-    if (values.direction === 'long' && numbers.stop >= numbers.entry) errors.stop = '做多止损价必须低于入场价';
-    if (values.direction === 'short' && numbers.stop <= numbers.entry) errors.stop = '做空止损价必须高于入场价';
+  if (!errors.entry && !errors.stop && numbers.stop === numbers.entry) errors.stop = '止损价格不能等于入场价格';
+  const direction = !errors.entry && !errors.stop ? (numbers.stop > numbers.entry ? 'short' : 'long') : null;
+  if (hasTarget && direction && !errors.target) {
+    if (direction === 'long' && numbers.target <= numbers.entry) errors.target = '做多目标价必须高于入场价';
+    if (direction === 'short' && numbers.target >= numbers.entry) errors.target = '做空目标价必须低于入场价';
   }
-  if (hasTarget && !errors.entry && !errors.target) {
-    if (values.direction === 'long' && numbers.target <= numbers.entry) errors.target = '做多目标价必须高于入场价';
-    if (values.direction === 'short' && numbers.target >= numbers.entry) errors.target = '做空目标价必须低于入场价';
-  }
-  if (Object.keys(errors).length) return { errors, result: null };
+  if (Object.keys(errors).length) return { errors, result: null, direction };
 
   const distance = Math.abs(numbers.entry - numbers.stop);
   const riskAmount = numbers.balance * (numbers.risk / 100);
@@ -42,7 +38,7 @@ export function calculatePosition(values) {
     profit: hasTarget ? quantity * reward : null,
   };
   if (Object.values(result).some(value => value !== null && (!Number.isFinite(value) || value <= 0))) {
-    return { errors: { entry: '数值超出可计算范围，请调整资金或价格' }, result: null };
+    return { errors: { entry: '数值超出可计算范围，请调整资金或价格' }, result: null, direction };
   }
-  return { errors, result };
+  return { errors, result, direction };
 }

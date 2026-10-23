@@ -3,17 +3,17 @@ import { calculatePosition } from './calculator.js';
 import { parsePastedPrice } from './price.js';
 import { formatQuantity, formatResultValue } from './format.js';
 
-const example = { balance: '10000', risk: '4', leverage: '10', entry: '65000', stop: '63000', target: '71000', direction: 'long' };
+const defaults = { balance: '10000', risk: '4', leverage: '10', entry: '', stop: '', target: '' };
 const leverageOptions = ['1', '2', '3', '5', '10', '20', '25', '50', '75', '100'];
 const preferencesKey = 'position-size:preferences';
 const number = (value, decimals = 2) => new Intl.NumberFormat('en-US', value !== 0 && (Math.abs(value) < 10 ** -decimals || Math.abs(value) >= 1e12) ? { notation: 'scientific', maximumSignificantDigits: 4 } : { maximumFractionDigits: decimals }).format(value);
 
 function loadValues() {
-  const values = { ...example };
+  const values = { ...defaults };
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     for (const field of ['balance', 'risk', 'leverage']) {
-      if (saved && typeof saved[field] === 'string' && !calculatePosition({ ...example, [field]: saved[field] }).errors[field] && (field !== 'leverage' || leverageOptions.includes(saved[field]))) values[field] = saved[field];
+      if (saved && typeof saved[field] === 'string' && !calculatePosition({ ...defaults, [field]: saved[field] }).errors[field] && (field !== 'leverage' || leverageOptions.includes(saved[field]))) values[field] = saved[field];
     }
   } catch { /* 无法读取本地设置时使用默认值。 */ }
   return values;
@@ -39,15 +39,15 @@ function Field({ id, label, suffix, value, onChange, error, optional, onPastePri
   return <div className="field">
     <label htmlFor={id}>{label}{optional && <span className="optional">选填</span>}</label>
     <div className={`input-wrap ${error ? 'invalid' : ''}`}>
-      <input id={id} name={id} type="number" min="0" step="any" inputMode="decimal" value={value} placeholder={optional ? '输入目标价格' : '0'} onChange={event => onChange(id, event.target.value)} onPaste={onPastePrice ? event => { event.preventDefault(); onPastePrice(id, event.clipboardData.getData('text')); } : undefined} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} />
+      <input id={id} name={id} type="number" min="0" step="any" inputMode="decimal" value={value} placeholder={onPastePrice ? `输入${label}` : '0'} autoComplete={onPastePrice ? 'off' : undefined} onChange={event => onChange(id, event.target.value)} onPaste={onPastePrice ? event => { event.preventDefault(); onPastePrice(id, event.clipboardData.getData('text')); } : undefined} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} />
       <span className="input-suffix">{suffix}</span>
     </div>
     {error && <span className="field-error" id={`${id}-error`}>{error}</span>}
   </div>;
 }
 
-function PlanChart({ values, result }) {
-  const long = values.direction === 'long';
+function PlanChart({ values, result, direction }) {
+  const long = direction === 'long';
   const entryY = values.target ? (long ? 120 : 85) : (long ? 60 : 150);
   const stopY = long ? 180 : 25;
   const targetY = long ? 25 : 180;
@@ -80,7 +80,7 @@ export default function App() {
   const [copyState, setCopyState] = useState('');
   const [pasteErrors, setPasteErrors] = useState({});
   const [storageFailed, setStorageFailed] = useState(false);
-  const { errors, result } = calculatePosition(values);
+  const { errors, result, direction } = calculatePosition(values);
   const update = (id, value) => { setValues(current => ({ ...current, [id]: value })); setPasteErrors(current => ({ ...current, [id]: '' })); setCopyState(''); };
 
   useEffect(() => {
@@ -100,23 +100,9 @@ export default function App() {
     update(id, price);
   }
 
-  function changeDirection(direction) {
-    if (direction === values.direction) return;
-    const entry = Number(values.entry);
-    const sign = direction === 'long' ? 1 : -1;
-    setValues(current => ({
-      ...current,
-      direction,
-      stop: current.stop && entry > 0 && Number(current.stop) > 0 ? String(entry - sign * Math.abs(entry - Number(current.stop))) : current.stop,
-      target: current.target && entry > 0 && Number(current.target) > 0 ? String(entry + sign * Math.abs(entry - Number(current.target))) : current.target,
-    }));
-    setPasteErrors({});
-    setCopyState('');
-  }
-
   async function copyResult() {
     try {
-      await navigator.clipboard.writeText(`${values.direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
+      await navigator.clipboard.writeText(`${direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
       setCopyState('已复制');
     } catch { setCopyState('复制失败，请手动选择结果'); }
   }
@@ -138,7 +124,7 @@ export default function App() {
 
       <div className="workspace" id="calculator">
         <section className="parameters card" aria-labelledby="parameters-title">
-          <div className="section-heading"><div className="heading-with-icon"><span className="section-icon"><Icon name="bars" size={18} /></span><h2 id="parameters-title">设置交易参数</h2></div><button className="reset-button" onClick={() => { setValues(example); setCopyState(''); setPasteErrors({}); }}><Icon name="reset" size={14} />恢复默认</button></div>
+          <div className="section-heading"><div className="heading-with-icon"><span className="section-icon"><Icon name="bars" size={18} /></span><h2 id="parameters-title">设置交易参数</h2></div><button className="reset-button" onClick={() => { setValues(defaults); setCopyState(''); setPasteErrors({}); }}><Icon name="reset" size={14} />恢复默认</button></div>
           <div className="form-section">
             <div className="step-label"><span>01</span> 资金与风险</div>
             <div className="fields-grid">
@@ -152,8 +138,8 @@ export default function App() {
           </div>
           <div className="form-section trade-section">
             <div className="step-label"><span>02</span> 交易计划</div>
-            <div className="direction-control" role="group" aria-label="交易方向"><button className={values.direction === 'long' ? 'selected long' : ''} aria-pressed={values.direction === 'long'} onClick={() => changeDirection('long')}><Icon name="up" size={16} />做多 <span>Long</span></button><button className={values.direction === 'short' ? 'selected short' : ''} aria-pressed={values.direction === 'short'} onClick={() => changeDirection('short')}><Icon name="down" size={16} />做空 <span>Short</span></button></div>
-            <div className="fields-grid price-fields"><Field id="entry" label="入场价格" suffix="USDT" value={values.entry} onChange={update} onPastePrice={pastePrice} error={errors.entry || pasteErrors.entry} /><Field id="stop" label="止损价格" suffix="USDT" value={values.stop} onChange={update} onPastePrice={pastePrice} error={errors.stop || pasteErrors.stop} /></div>
+            <div className={`direction-status ${direction || ''}`} role="status" aria-label="交易方向" aria-live="polite">{direction ? <><Icon name={direction === 'long' ? 'up' : 'down'} size={16} /><strong>{direction === 'long' ? '做多 Long' : '做空 Short'}</strong><span>自动识别</span></> : <span>输入入场价与止损价后自动识别多空</span>}</div>
+            <div className="fields-grid price-fields"><Field id="entry" label="入场价格" suffix="USDT" value={values.entry} onChange={update} onPastePrice={pastePrice} error={(values.entry ? errors.entry : '') || pasteErrors.entry} /><Field id="stop" label="止损价格" suffix="USDT" value={values.stop} onChange={update} onPastePrice={pastePrice} error={(values.stop ? errors.stop : '') || pasteErrors.stop} /></div>
             <Field id="target" label="止盈价格" optional suffix="USDT" value={values.target} onChange={update} onPastePrice={pastePrice} error={errors.target || pasteErrors.target} />
           </div>
         </section>
@@ -181,11 +167,11 @@ export default function App() {
       </div>
 
       <div className="below-grid">
-        <PlanChart values={values} result={result} />
+        <PlanChart values={values} result={result} direction={direction} />
         <section className="explanation card" id="how-it-works" aria-labelledby="formula-title"><div className="section-heading"><h2 id="formula-title">简单的公式，清晰的决策</h2><Icon name="info" size={17} /></div><p>用你能承担的风险，反推合约数量。</p><div className="formula"><span>合约数量</span><b>=</b><div><span>账户资金 × 风险比例</span><hr /><span>| 入场价格 − 止损价格 |</span></div></div><div className="formula-example">代入当前参数<span>{result ? `${number(Number(values.balance))} × ${number(Number(values.risk))}% ÷ ${number(Math.abs(Number(values.entry) - Number(values.stop)))}` : '等待有效参数'}<b>{result ? `= ${formatQuantity(result.quantity)} 单位` : '—'}</b></span></div><p className="margin-formula">预计保证金 = 仓位大小 ÷ 杠杆倍数</p><a className="learn-link" href="https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size" target="_blank" rel="noreferrer">了解仓位与风险的关系<Icon name="up" size={15} /></a></section>
       </div>
 
-      <div className="calculation-note"><Icon name="info" size={16} /><p>适用于数量 × 价格的线性计价，保证金按入场价估算；未计手续费、滑点、数量步长及维持保证金，不计算强平。切换多空时，止损与止盈会按原价差镜像调整。</p></div>
+      <div className="calculation-note"><Icon name="info" size={16} /><p>适用于数量 × 价格的线性计价，保证金按入场价估算；未计手续费、滑点、数量步长及维持保证金，不计算强平。交易方向按入场价与止损价自动识别。</p></div>
     </main>
     <footer><span className="footer-brand">仓位 <span>Position</span><i>·</i> 每一笔，心中有数。</span><span><Icon name="lock" size={13} />所有计算在你的浏览器中完成</span></footer>
   </>;

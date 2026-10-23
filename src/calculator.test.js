@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculatePosition } from './calculator.js';
 
-const sample = { balance: '10000', risk: '4', leverage: '10', entry: '65000', stop: '63000', target: '71000', direction: 'long' };
+const sample = { balance: '10000', risk: '4', leverage: '10', entry: '65000', stop: '63000', target: '71000' };
 
 test('按风险计算做多仓位和目标收益', () => {
-  const { errors, result } = calculatePosition(sample);
+  const { errors, result, direction } = calculatePosition(sample);
   assert.deepEqual(errors, {});
+  assert.equal(direction, 'long');
   assert.equal(result.quantity, 0.2);
   assert.equal(result.riskAmount, 400);
   assert.equal(result.notional, 13000);
@@ -18,8 +19,9 @@ test('按风险计算做多仓位和目标收益', () => {
 });
 
 test('做空和空目标价', () => {
-  const short = calculatePosition({ ...sample, stop: 67000, target: 59000, direction: 'short' });
+  const short = calculatePosition({ ...sample, stop: 67000, target: 59000 });
   assert.deepEqual(short.errors, {});
+  assert.equal(short.direction, 'short');
   assert.equal(short.result.quantity, 0.2);
   assert.equal(short.result.profit, 1200);
   assert.equal(short.result.rewardRisk, 3);
@@ -31,20 +33,32 @@ test('做空和空目标价', () => {
   }
 });
 
-test('非法方向、止损及目标价返回对应字段错误', () => {
+test('止损等于入场或目标价与自动方向冲突时返回字段错误', () => {
   for (const [changes, field] of [
-    [{ direction: 'buy' }, 'direction'],
     [{ stop: 65000 }, 'stop'],
-    [{ stop: 67000 }, 'stop'],
     [{ target: 65000 }, 'target'],
     [{ target: 63000 }, 'target'],
-    [{ direction: 'short', stop: 63000, target: 59000 }, 'stop'],
-    [{ direction: 'short', stop: 67000, target: 71000 }, 'target'],
+    [{ stop: 67000, target: 65000 }, 'target'],
+    [{ stop: 67000, target: 71000 }, 'target'],
   ]) {
     const { errors, result } = calculatePosition({ ...sample, ...changes });
     assert.ok(errors[field], `${field} 应有错误`);
     assert.equal(result, null);
   }
+});
+
+test('方向仅由有效入场价与止损价推断，不受其它参数错误影响', () => {
+  for (const field of ['entry', 'stop']) {
+    for (const value of ['', '  ', null, undefined, 0, -1, 'abc', Infinity, NaN, true]) {
+      const { direction, result } = calculatePosition({ ...sample, [field]: value });
+      assert.equal(direction, null);
+      assert.equal(result, null);
+    }
+  }
+  assert.equal(calculatePosition({ ...sample, stop: sample.entry }).direction, null);
+  assert.equal(calculatePosition({ ...sample, balance: '' }).direction, 'long');
+  assert.equal(calculatePosition({ ...sample, stop: 67000 }).direction, 'short');
+  assert.equal(calculatePosition({ ...sample, entry: 62000, target: '' }).direction, 'short');
 });
 
 test('拒绝非正数、非数及超过 100% 的风险', () => {
