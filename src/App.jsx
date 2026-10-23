@@ -34,13 +34,12 @@ function Icon({ name, size = 20, ...props }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}><path d={paths[name]} /></svg>;
 }
 
-function Field({ id, label, suffix, value, onChange, error, optional, onPastePrice, onQuickPaste }) {
+function Field({ id, label, suffix, value, onChange, error, optional, onPastePrice }) {
   return <div className="field">
     <label htmlFor={id}>{label}{optional && <span className="optional">选填</span>}</label>
     <div className={`input-wrap ${error ? 'invalid' : ''}`}>
       <input id={id} name={id} type="number" min="0" step="any" inputMode="decimal" value={value} placeholder={optional ? '输入目标价格' : '0'} onChange={event => onChange(id, event.target.value)} onPaste={onPastePrice ? event => { event.preventDefault(); onPastePrice(id, event.clipboardData.getData('text')); } : undefined} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} />
       <span className="input-suffix">{suffix}</span>
-      {onQuickPaste && <button type="button" className="paste-button" aria-label={`粘贴${label}`} title={`从剪贴板粘贴${label}`} onClick={() => onQuickPaste(id)}>粘贴</button>}
     </div>
     {error && <span className="field-error" id={`${id}-error`}>{error}</span>}
   </div>;
@@ -100,11 +99,6 @@ export default function App() {
     update(id, price);
   }
 
-  async function pasteFromClipboard(id) {
-    try { pastePrice(id, await navigator.clipboard.readText()); }
-    catch { setPasteErrors(current => ({ ...current, [id]: '无法读取剪贴板，请在输入框中使用系统粘贴。' })); }
-  }
-
   function changeDirection(direction) {
     if (direction === values.direction) return;
     const entry = Number(values.entry);
@@ -146,22 +140,21 @@ export default function App() {
           <div className="section-heading"><div className="heading-with-icon"><span className="section-icon"><Icon name="bars" size={18} /></span><h2 id="parameters-title">设置交易参数</h2></div><button className="reset-button" onClick={() => { setValues(example); setCopyState(''); setPasteErrors({}); }}><Icon name="reset" size={14} />恢复默认</button></div>
           <div className="form-section">
             <div className="step-label"><span>01</span> 资金与风险</div>
-            <div className="fields-grid account-fields">
+            <div className="fields-grid">
               <Field id="balance" label="账户资金" suffix="USDT" value={values.balance} onChange={update} error={errors.balance} />
               <Field id="risk" label="单笔风险比例" suffix="%" value={values.risk} onChange={update} error={errors.risk} />
             </div>
             <div className="risk-row"><span>每笔愿意承担的计划亏损</span><div className="risk-presets" role="group" aria-label="风险比例快捷选择">{['1', '2', '3', '4'].map(value => <button key={value} aria-pressed={values.risk === value} className={values.risk === value ? 'selected' : ''} onClick={() => update('risk', value)}>{value}%</button>)}</div></div>
             <div className="leverage-row"><div><label htmlFor="leverage">杠杆倍数</label><span>仅影响预计保证金，不改变风险预算</span></div><div className="input-wrap"><select id="leverage" value={values.leverage} onChange={event => update('leverage', event.target.value)}>{leverageOptions.map(value => <option key={value} value={value}>{value}x</option>)}</select></div></div>
             {errors.leverage && <span className="field-error">{errors.leverage}</span>}
-            <p className={`storage-note ${storageFailed ? 'field-error' : ''}`} role="status"><Icon name="lock" size={12} />{storageFailed ? '本地存储不可用，本次设置无法保留' : '自动记住账户资金、风险比例与杠杆'}</p>
+            {storageFailed && <p className="storage-error" role="status"><Icon name="info" size={12} />本地存储不可用，本次设置无法保留</p>}
           </div>
           <div className="form-section trade-section">
             <div className="step-label"><span>02</span> 交易计划</div>
             <div className="direction-control" role="group" aria-label="交易方向"><button className={values.direction === 'long' ? 'selected long' : ''} aria-pressed={values.direction === 'long'} onClick={() => changeDirection('long')}><Icon name="up" size={16} />做多 <span>Long</span></button><button className={values.direction === 'short' ? 'selected short' : ''} aria-pressed={values.direction === 'short'} onClick={() => changeDirection('short')}><Icon name="down" size={16} />做空 <span>Short</span></button></div>
-            <div className="fields-grid price-fields"><Field id="entry" label="入场价格" suffix="USDT" value={values.entry} onChange={update} onPastePrice={pastePrice} onQuickPaste={pasteFromClipboard} error={errors.entry || pasteErrors.entry} /><Field id="stop" label="止损价格" suffix="USDT" value={values.stop} onChange={update} onPastePrice={pastePrice} onQuickPaste={pasteFromClipboard} error={errors.stop || pasteErrors.stop} /></div>
-            <Field id="target" label="止盈价格" optional suffix="USDT" value={values.target} onChange={update} onPastePrice={pastePrice} onQuickPaste={pasteFromClipboard} error={errors.target || pasteErrors.target} />
+            <div className="fields-grid price-fields"><Field id="entry" label="入场价格" suffix="USDT" value={values.entry} onChange={update} onPastePrice={pastePrice} error={errors.entry || pasteErrors.entry} /><Field id="stop" label="止损价格" suffix="USDT" value={values.stop} onChange={update} onPastePrice={pastePrice} error={errors.stop || pasteErrors.stop} /></div>
+            <Field id="target" label="止盈价格" optional suffix="USDT" value={values.target} onChange={update} onPastePrice={pastePrice} error={errors.target || pasteErrors.target} />
           </div>
-          <div className="form-footnote"><span className="live-dot" />修改参数，结果即时更新 <span className="footnote-arrow">↗</span></div>
         </section>
 
         <section className="results-column" aria-label="计算结果">

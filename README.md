@@ -13,7 +13,7 @@ npm run dev
 
 风险快捷值固定为 1%、2%、3%、4%，默认 4%；杠杆默认 10x。账户资金、风险比例和杠杆的有效值自动写入当前站点的 localStorage（键 `position-size:preferences`），刷新后恢复；价格与方向不保存。恢复默认会重置这些设置。存储被禁用时仍可计算，并显示无法保存的提示。
 
-入场、止损、止盈价格均提供快捷粘贴按钮，也支持在输入框内使用系统粘贴。`65,000.25`、`1,234,567.89` 等合法千分位会自动识别；格式错误时保留原值并显示错误。若浏览器不允许读取剪贴板，使用系统粘贴即可。
+入场、止损、止盈价格支持直接在输入框内使用 Ctrl+V 或系统粘贴。`65,000.25`、`1,234,567.89` 等合法千分位会自动识别；格式错误时保留原值并显示错误。
 
 仓位数量 = 账户资金 × 风险比例 ÷ |入场价 − 止损价|；预计保证金 = 仓位金额 ÷ 杠杆。杠杆只影响保证金占用，不改变按风险反推的数量及计划盈亏。保证金按入场价估算，未计手续费、滑点、交易数量步长和维持保证金，不计算强平。预计保证金超出账户资金时显示提示，不自动截断。价格区间图的间距不按数值比例，仅展示交易参数，并非市场数据或预测。
 
@@ -27,4 +27,4 @@ GitHub 仓库：[ggzui/position-size](https://github.com/ggzui/position-size)；
 
 界面字体通过 Google Fonts 加载 DM Sans / Noto Sans SC；不可用时使用本地无衬线字体。
 
-参考：[React useState](https://react.dev/reference/react/useState)、[Vite 静态部署与 GitHub Pages](https://vite.dev/guide/static-deploy.html#github-pages)、[CME 仓位与风险](https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size)、[初始保证金公式](https://www.bybit.com/en/help-center/article/Initial-Margin-USDT-Contract)、[Clipboard readText](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText)、[localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)。
+参考：[React useState](https://react.dev/reference/react/useState)、[Vite 静态部署与 GitHub Pages](https://vite.dev/guide/static-deploy.html#github-pages)、[CME 仓位与风险](https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size)、[初始保证金公式](https://www.bybit.com/en/help-center/article/Initial-Margin-USDT-Contract)、[localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)。
