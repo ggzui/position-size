@@ -19,6 +19,8 @@ npm run dev
 
 网页与复制结果统一使用「合约数量、仓位大小、预计保证金、保证金比率」。合约数量四舍五入至最多六位小数，去掉末尾多余的零；仓位大小、预计保证金、保证金比率固定保留两位小数。网页与复制共用格式，内部计算保留完整精度。
 
+点击结果卡中的合约数量、仓位大小或预计保证金数字可单独复制，仅复制相同显示精度的纯数字，不含千分位逗号、名称及单位，方便粘贴到交易所。无有效结果时禁止复制；底部状态显示复制成功或失败，原「复制计算结果」按钮仍复制完整计划。
+
 GitHub 仓库：[ggzui/position-size](https://github.com/ggzui/position-size)；网站地址：[仓位计算器](https://ggzui.github.io/position-size/)；发布记录：[GitHub Actions](https://github.com/ggzui/position-size/actions)。
 
 部署工作流位于 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)。每次 push 到 `main` 分支后，GitHub Actions 使用 Node.js 24 依次运行 `npm ci`、`npm test`、`npm run build`，通过后上传 `dist/` 并发布到 GitHub Pages；测试或构建失败时停止发布。也可在 Actions 页选择「Deploy to GitHub Pages」→「Run workflow」，选择 `main` 手动发布。

@@ -100,11 +100,15 @@ export default function App() {
     update(id, price);
   }
 
-  async function copyResult() {
+  async function copyText(text, label = '') {
     try {
-      await navigator.clipboard.writeText(`${direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
-      setCopyState('已复制');
+      await navigator.clipboard.writeText(text);
+      setCopyState(`${label}已复制`);
     } catch { setCopyState('复制失败，请手动选择结果'); }
+  }
+
+  function copyResult() {
+    return copyText(`${direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
   }
 
   return <>
@@ -148,9 +152,9 @@ export default function App() {
           <div className="result-card">
             <div className="result-topline"><span><span className="live-dot" />你的仓位计划</span><span className="result-leverage">{values.leverage}x 杠杆</span></div>
             <p className="quantity-label">合约数量</p>
-            <div className="quantity" aria-live="polite" aria-atomic="true">{result ? formatQuantity(result.quantity) : '—'}<span>单位</span></div>
-            <div className="notional">仓位大小 <strong>{result ? formatResultValue(result.notional) : '—'} <span>USDT</span></strong></div>
-            <div className="notional">预计保证金 <strong>{result ? formatResultValue(result.margin) : '—'} <span>USDT</span></strong></div>
+            <div className="quantity" aria-live="polite" aria-atomic="true"><button type="button" className="number-copy" aria-label={`复制合约数量：${result ? formatQuantity(result.quantity) : '—'}`} title="点击复制合约数量" disabled={!result} onClick={() => copyText(formatQuantity(result.quantity).replaceAll(',', ''), '合约数量')}>{result ? formatQuantity(result.quantity) : '—'}<span>单位</span></button></div>
+            <div className="notional">仓位大小 <strong><button type="button" className="number-copy" aria-label={`复制仓位大小：${result ? formatResultValue(result.notional) : '—'}`} title="点击复制仓位大小" disabled={!result} onClick={() => copyText(formatResultValue(result.notional).replaceAll(',', ''), '仓位大小')}>{result ? formatResultValue(result.notional) : '—'}</button> <span>USDT</span></strong></div>
+            <div className="notional">预计保证金 <strong><button type="button" className="number-copy" aria-label={`复制预计保证金：${result ? formatResultValue(result.margin) : '—'}`} title="点击复制预计保证金" disabled={!result} onClick={() => copyText(formatResultValue(result.margin).replaceAll(',', ''), '预计保证金')}>{result ? formatResultValue(result.margin) : '—'}</button> <span>USDT</span></strong></div>
             <div className="result-divider" />
             <div className="capital-label"><span>保证金比率</span><strong>{result ? formatResultValue(result.marginUsage) : '—'}%</strong></div>
             <div className="capital-bar"><span style={{ width: `${Math.min(result?.marginUsage ?? 0, 100)}%` }} /></div>
@@ -162,7 +166,7 @@ export default function App() {
             <div className="metric card"><span className="metric-label"><i className="metric-dot gain" />计划盈利</span><strong>{result?.profit != null ? number(result.profit) : '—'}<small> USDT</small></strong><span className="metric-detail">达到止盈价格时</span></div>
           </div>
           <div className="ratio-card card"><div><span className="metric-label">风险收益比</span><strong>{result?.rewardRisk != null ? `1 : ${number(result.rewardRisk)}` : '—'}</strong></div><div className="ratio-visual" aria-hidden="true"><span style={{ flex: 1 }} /><i style={{ flex: result?.rewardRisk ?? 1, opacity: result?.rewardRisk != null ? 1 : .2 }} /></div><span className="ratio-description">{result?.rewardRisk != null ? `每承担 1 份风险，对应 ${number(result.rewardRisk)} 份潜在收益` : '填写止盈价格后显示'}</span></div>
-          <button className="copy-button" aria-label="复制计算结果" disabled={!result} onClick={copyResult}><Icon name={copyState === '已复制' ? 'check' : 'copy'} size={17} /><span role="status">{copyState || '复制计算结果'}</span><Icon name="arrow" size={18} /></button>
+          <button className="copy-button" aria-label="复制计算结果" disabled={!result} onClick={copyResult}><Icon name={copyState.endsWith('已复制') ? 'check' : 'copy'} size={17} /><span role="status">{copyState || '复制计算结果'}</span><Icon name="arrow" size={18} /></button>
         </section>
       </div>
 
