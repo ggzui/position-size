@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { calculatePosition } from './calculator.js';
+import { calculatePosition, feeRate } from './calculator.js';
 import { parsePastedPrice } from './price.js';
 import { formatQuantity, formatResultValue } from './format.js';
 
 const defaults = { balance: '10000', risk: '4', leverage: '10', entry: '', stop: '', target: '' };
 const leverageOptions = ['1', '2', '3', '5', '10', '20', '25', '50', '75', '100'];
 const preferencesKey = 'position-size:preferences';
+const feePercent = (feeRate * 100).toFixed(4);
 const number = (value, decimals = 2) => new Intl.NumberFormat('en-US', value !== 0 && (Math.abs(value) < 10 ** -decimals || Math.abs(value) >= 1e12) ? { notation: 'scientific', maximumSignificantDigits: 4 } : { maximumFractionDigits: decimals }).format(value);
 
 function loadValues() {
@@ -52,20 +53,20 @@ function PlanChart({ values, result, direction }) {
   const stopY = long ? 180 : 25;
   const targetY = long ? 25 : 180;
   const points = [
-    ...(values.target ? [{ label: '止盈价格', value: values.target, color: 'positive', profit: result?.profit, sign: '+', position: targetY }] : []),
+    ...(values.target ? [{ label: '止盈价格', value: values.target, color: result?.profit > 0 ? 'positive' : result?.profit < 0 ? 'negative' : 'neutral', profit: result?.profit, sign: result?.profit > 0 ? '+' : '', position: targetY }] : []),
     { label: '入场价格', value: values.entry, color: 'neutral', profit: null, position: entryY },
     { label: '止损价格', value: values.stop, color: 'negative', profit: result?.riskAmount, sign: '−', position: stopY },
   ];
   return <section className="plan-card card" aria-labelledby="plan-title">
-    <div className="section-heading"><h2 id="plan-title">让风险，看得见</h2><span className="subtle">价格区间示意 · 间距非比例</span></div>
+    <div className="section-heading"><h2 id="plan-title">让风险，看得见</h2><span className="subtle">盈亏含手续费 · 间距非比例</span></div>
     {result ? <>
       <div className="plan-chart">
         <svg className="plan-drawing" viewBox="0 0 580 218" preserveAspectRatio="none" aria-hidden="true">
           <defs><linearGradient id="reward-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#b8d7a8" stopOpacity=".23"/><stop offset="1" stopColor="#b8d7a8" stopOpacity=".02"/></linearGradient></defs>
-          {values.target && <rect x="0" y={Math.min(targetY, entryY)} width="580" height={Math.abs(targetY - entryY)} fill="url(#reward-fill)" />}
+          {values.target && <rect x="0" y={Math.min(targetY, entryY)} width="580" height={Math.abs(targetY - entryY)} fill={result.profit > 0 ? 'url(#reward-fill)' : '#fdf1ed'} />}
           <rect x="0" y={Math.min(stopY, entryY)} width="580" height={Math.abs(stopY - entryY)} fill="#fdf1ed" opacity=".6" />
           {points.map(point => <line key={point.label} x1="0" y1={point.position} x2="580" y2={point.position} stroke={point.position === entryY ? '#b1bcb3' : '#d7dfd4'} strokeDasharray={point.position === entryY ? '0' : '4 5'} />)}
-          {values.target && <text x="290" y={(targetY + entryY) / 2 + 4} textAnchor="middle" fill="#7e9a6d" fontSize="12">目标区间 · {number(result.rewardRisk)}R</text>}
+          {values.target && <text x="290" y={(targetY + entryY) / 2 + 4} textAnchor="middle" fill={result.profit > 0 ? '#7e9a6d' : '#b28c78'} fontSize="12">目标净收益 · {number(result.rewardRisk)}R</text>}
           <text x="290" y={(stopY + entryY) / 2 + 4} textAnchor="middle" fill="#b28c78" fontSize="11">风险区间 · 1R</text>
         </svg>
         {points.map(point => <div className={`price-level ${point.color}`} key={point.label} style={{ top: `${point.position / 218 * 100}%` }}><span>{point.label}<b>{point.value ? number(Number(point.value)) : '未设置'}</b></span>{point.profit !== null && point.profit !== undefined && <strong>{point.sign}{number(point.profit)} <small>USDT</small></strong>}</div>)}
@@ -108,7 +109,7 @@ export default function App() {
   }
 
   function copyResult() {
-    return copyText(`${direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算：${result.riskAmount} USDT\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，未计手续费、滑点、数量步长及强平。`);
+    return copyText(`${direction === 'long' ? '做多' : '做空'} · ${values.leverage}x 杠杆\n合约数量：${formatQuantity(result.quantity)} 单位\n仓位大小：${formatResultValue(result.notional)} USDT\n预计保证金：${formatResultValue(result.margin)} USDT\n保证金比率：${formatResultValue(result.marginUsage)}%\n风险预算（含止损开平手续费）：${formatResultValue(result.riskAmount)} USDT\n手续费率：${feePercent}%（每次成交）\n开仓手续费：${formatResultValue(result.entryFee)} USDT\n止损开平手续费：${formatResultValue(result.stopFees)} USDT${result.profit != null ? `\n止盈开平手续费：${formatResultValue(result.targetFees)} USDT\n计划净收益：${number(result.profit)} USDT\n净风险收益比：1 : ${number(result.rewardRisk)}` : ''}\n入场：${values.entry}；止损：${values.stop}${values.target ? `；止盈：${values.target}` : ''}\n线性计价估算，已计开平仓手续费，未计滑点、资金费、数量步长及强平。`);
   }
 
   return <>
@@ -137,6 +138,7 @@ export default function App() {
             </div>
             <div className="risk-row"><span>每笔愿意承担的计划亏损</span><div className="risk-presets" role="group" aria-label="风险比例快捷选择">{['1', '2', '3', '4'].map(value => <button key={value} aria-pressed={values.risk === value} className={values.risk === value ? 'selected' : ''} onClick={() => update('risk', value)}>{value}%</button>)}</div></div>
             <div className="leverage-row"><div><label htmlFor="leverage">杠杆倍数</label><span>仅影响预计保证金，不改变风险预算</span></div><div className="input-wrap"><select id="leverage" value={values.leverage} onChange={event => update('leverage', event.target.value)}>{leverageOptions.map(value => <option key={value} value={value}>{value}x</option>)}</select></div></div>
+            <div className="fee-rate"><span>手续费率（开仓、平仓各收取）</span><strong>{feePercent}%</strong></div>
             {errors.leverage && <span className="field-error">{errors.leverage}</span>}
             {storageFailed && <p className="storage-error" role="status"><Icon name="info" size={12} />本地存储不可用，本次设置无法保留</p>}
           </div>
@@ -155,27 +157,28 @@ export default function App() {
             <div className="quantity" aria-live="polite" aria-atomic="true"><button type="button" className="number-copy" aria-label={`复制合约数量：${result ? formatQuantity(result.quantity) : '—'}`} title="点击复制合约数量" disabled={!result} onClick={() => copyText(formatQuantity(result.quantity).replaceAll(',', ''), '合约数量')}>{result ? formatQuantity(result.quantity) : '—'}<span>单位</span></button></div>
             <div className="notional">仓位大小 <strong><button type="button" className="number-copy" aria-label={`复制仓位大小：${result ? formatResultValue(result.notional) : '—'}`} title="点击复制仓位大小" disabled={!result} onClick={() => copyText(formatResultValue(result.notional).replaceAll(',', ''), '仓位大小')}>{result ? formatResultValue(result.notional) : '—'}</button> <span>USDT</span></strong></div>
             <div className="notional">预计保证金 <strong><button type="button" className="number-copy" aria-label={`复制预计保证金：${result ? formatResultValue(result.margin) : '—'}`} title="点击复制预计保证金" disabled={!result} onClick={() => copyText(formatResultValue(result.margin).replaceAll(',', ''), '预计保证金')}>{result ? formatResultValue(result.margin) : '—'}</button> <span>USDT</span></strong></div>
+            <div className="notional">开仓手续费 <strong>{result ? formatResultValue(result.entryFee) : '—'} <span>USDT</span></strong></div>
             <div className="result-divider" />
             <div className="capital-label"><span>保证金比率</span><strong>{result ? formatResultValue(result.marginUsage) : '—'}%</strong></div>
             <div className="capital-bar"><span style={{ width: `${Math.min(result?.marginUsage ?? 0, 100)}%` }} /></div>
-            <div className="result-bottom"><Icon name="shield" size={15} /><span>{result ? `风险预算为账户资金的 ${number(Number(values.risk))}%` : '请先填写有效的交易参数'}</span></div>
+            <div className="result-bottom"><Icon name="shield" size={15} /><span>{result ? `含手续费风险预算：账户资金的 ${number(Number(values.risk))}%` : '请先填写有效的交易参数'}</span></div>
           </div>
-          {result && result.marginUsage > 100 && <div className="capital-warning" role="status"><Icon name="info" size={17} /><span>预计保证金超出账户资金，请降低风险或调整交易参数。</span></div>}
+          {result && result.margin + result.entryFee > Number(values.balance) && <div className="capital-warning" role="status"><Icon name="info" size={17} /><span>预计保证金与开仓手续费合计超出账户资金，请降低风险或调整交易参数。</span></div>}
           <div className="metrics-grid">
-            <div className="metric card"><span className="metric-label"><i className="metric-dot loss" />计划亏损</span><strong>{result ? number(result.riskAmount) : '—'}<small> USDT</small></strong><span className="metric-detail">止损距离 {result ? number(result.stopPercent) : '—'}%</span></div>
-            <div className="metric card"><span className="metric-label"><i className="metric-dot gain" />计划盈利</span><strong>{result?.profit != null ? number(result.profit) : '—'}<small> USDT</small></strong><span className="metric-detail">达到止盈价格时</span></div>
+            <div className="metric card"><span className="metric-label"><i className="metric-dot loss" />计划亏损</span><strong>{result ? number(result.riskAmount) : '—'}<small> USDT</small></strong><span className="metric-detail">止损距离 {result ? number(result.stopPercent) : '—'}%</span><span className="metric-detail">含开平手续费 {result ? formatResultValue(result.stopFees) : '—'} USDT</span></div>
+            <div className={`metric card ${result?.profit < 0 ? 'net-loss' : ''}`}><span className="metric-label"><i className={`metric-dot ${result?.profit < 0 ? 'loss' : 'gain'}`} />计划净收益</span><strong>{result?.profit != null ? number(result.profit) : '—'}<small> USDT</small></strong><span className="metric-detail">达到止盈价格时</span><span className="metric-detail">已扣开平手续费 {result?.targetFees != null ? formatResultValue(result.targetFees) : '—'} USDT</span></div>
           </div>
-          <div className="ratio-card card"><div><span className="metric-label">风险收益比</span><strong>{result?.rewardRisk != null ? `1 : ${number(result.rewardRisk)}` : '—'}</strong></div><div className="ratio-visual" aria-hidden="true"><span style={{ flex: 1 }} /><i style={{ flex: result?.rewardRisk ?? 1, opacity: result?.rewardRisk != null ? 1 : .2 }} /></div><span className="ratio-description">{result?.rewardRisk != null ? `每承担 1 份风险，对应 ${number(result.rewardRisk)} 份潜在收益` : '填写止盈价格后显示'}</span></div>
+          <div className="ratio-card card"><div><span className="metric-label">净风险收益比</span><strong>{result?.rewardRisk != null ? `1 : ${number(result.rewardRisk)}` : '—'}</strong></div><div className="ratio-visual" aria-hidden="true"><span style={{ flex: 1 }} /><i style={{ flex: Math.max(0, result?.rewardRisk ?? 1), opacity: result?.rewardRisk == null ? .2 : result.rewardRisk > 0 ? 1 : 0 }} /></div><span className="ratio-description">{result?.rewardRisk != null ? result.rewardRisk > 0 ? `每承担 1 份含费风险，对应 ${number(result.rewardRisk)} 份净收益` : '目标收益未超过手续费，净收益不为正' : '填写止盈价格后显示'}</span></div>
           <button className="copy-button" aria-label="复制计算结果" disabled={!result} onClick={copyResult}><Icon name={copyState.endsWith('已复制') ? 'check' : 'copy'} size={17} /><span role="status">{copyState || '复制计算结果'}</span><Icon name="arrow" size={18} /></button>
         </section>
       </div>
 
       <div className="below-grid">
         <PlanChart values={values} result={result} direction={direction} />
-        <section className="explanation card" id="how-it-works" aria-labelledby="formula-title"><div className="section-heading"><h2 id="formula-title">简单的公式，清晰的决策</h2><Icon name="info" size={17} /></div><p>用你能承担的风险，反推合约数量。</p><div className="formula"><span>合约数量</span><b>=</b><div><span>账户资金 × 风险比例</span><hr /><span>| 入场价格 − 止损价格 |</span></div></div><div className="formula-example">代入当前参数<span>{result ? `${number(Number(values.balance))} × ${number(Number(values.risk))}% ÷ ${number(Math.abs(Number(values.entry) - Number(values.stop)))}` : '等待有效参数'}<b>{result ? `= ${formatQuantity(result.quantity)} 单位` : '—'}</b></span></div><p className="margin-formula">预计保证金 = 仓位大小 ÷ 杠杆倍数</p><a className="learn-link" href="https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size" target="_blank" rel="noreferrer">了解仓位与风险的关系<Icon name="up" size={15} /></a></section>
+        <section className="explanation card" id="how-it-works" aria-labelledby="formula-title"><div className="section-heading"><h2 id="formula-title">简单的公式，清晰的决策</h2><Icon name="info" size={17} /></div><p>用你能承担的风险，反推合约数量。</p><div className="formula"><span>合约数量</span><b>=</b><div><span>账户资金 × 风险比例</span><hr /><span>| 入场价格 − 止损价格 | + 每单位开平手续费</span></div></div><div className="formula-example">代入当前参数<span>{result ? `${number(Number(values.balance))} × ${number(Number(values.risk))}% ÷ ${number(result.lossPerUnit, 6)}` : '等待有效参数'}<b>{result ? `= ${formatQuantity(result.quantity)} 单位` : '—'}</b></span></div><p className="margin-formula">开平手续费 = 合约数量 ×（入场价 + 平仓价）× {feePercent}%</p><p className="margin-formula">预计保证金 = 仓位大小 ÷ 杠杆倍数；手续费另计</p><a className="learn-link" href="https://www.cmegroup.com/education/courses/trade-and-risk-management/proper-position-size" target="_blank" rel="noreferrer">了解仓位与风险的关系<Icon name="up" size={15} /></a></section>
       </div>
 
-      <div className="calculation-note"><Icon name="info" size={16} /><p>适用于数量 × 价格的线性计价，保证金按入场价估算；未计手续费、滑点、数量步长及维持保证金，不计算强平。交易方向按入场价与止损价自动识别。</p></div>
+      <div className="calculation-note"><Icon name="info" size={16} /><p>适用于数量 × 价格的线性计价，开仓、平仓手续费均按成交金额的 {feePercent}% 估算，已计入止损风险和止盈净收益；保证金按入场价估算，未计滑点、资金费、数量步长及维持保证金，不计算强平。交易方向按入场价与止损价自动识别。</p></div>
     </main>
     <footer><span className="footer-brand">仓位 <span>Position</span><i>·</i> 每一笔，心中有数。</span><span><Icon name="lock" size={13} />所有计算在你的浏览器中完成</span></footer>
   </>;

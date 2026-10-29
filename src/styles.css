@@ -18,3 +18,6 @@ main{max-width:1184px;margin:auto;padding:0 32px}.hero{display:flex;justify-cont
 
 @media(max-width:520px){.risk-row{gap:10px}.risk-row>span{flex-basis:100%}.risk-presets{width:100%;margin-left:0}.risk-presets button{flex:1}.leverage-row>div>span{max-width:165px}}
 .number-copy{max-width:100%;min-height:24px;padding:0;border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;line-height:inherit;text-align:inherit;overflow-wrap:anywhere;vertical-align:baseline}.number-copy:not(:disabled):hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}.number-copy:disabled{opacity:1;cursor:default}
+
+.fee-rate{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:10px;color:#738164}.fee-rate strong{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:#596b5b}.metric.net-loss>strong{color:#aa6e5b}
+.ratio-card>div:first-child{flex-wrap:wrap;row-gap:4px}.ratio-card .metric-label{flex-shrink:0;white-space:nowrap}

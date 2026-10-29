@@ -1,3 +1,5 @@
+export const feeRate = 0.0005;
+
 export function calculatePosition(values) {
   const errors = {};
   const numbers = {};
@@ -23,21 +25,31 @@ export function calculatePosition(values) {
 
   const distance = Math.abs(numbers.entry - numbers.stop);
   const riskAmount = numbers.balance * (numbers.risk / 100);
-  const quantity = riskAmount / distance;
+  const entryFeePerUnit = numbers.entry * feeRate;
+  const lossPerUnit = distance + entryFeePerUnit + numbers.stop * feeRate;
+  const quantity = riskAmount / lossPerUnit;
   const notional = quantity * numbers.entry;
   const margin = notional / numbers.leverage;
   const reward = hasTarget ? Math.abs(numbers.target - numbers.entry) : null;
+  const entryFee = notional * feeRate;
+  const stopFees = quantity * (entryFeePerUnit + numbers.stop * feeRate);
+  const targetFees = hasTarget ? quantity * (entryFeePerUnit + numbers.target * feeRate) : null;
+  const profit = hasTarget ? quantity * (reward - entryFeePerUnit - numbers.target * feeRate) : null;
   const result = {
     quantity,
     riskAmount,
+    lossPerUnit,
     notional,
     margin,
+    entryFee,
+    stopFees,
+    targetFees,
     marginUsage: (margin / numbers.balance) * 100,
     stopPercent: (distance / numbers.entry) * 100,
-    rewardRisk: hasTarget ? reward / distance : null,
-    profit: hasTarget ? quantity * reward : null,
+    rewardRisk: hasTarget ? profit / riskAmount : null,
+    profit,
   };
-  if (Object.values(result).some(value => value !== null && (!Number.isFinite(value) || value <= 0))) {
+  if (Object.entries(result).some(([field, value]) => value !== null && (!Number.isFinite(value) || (value <= 0 && field !== 'profit' && field !== 'rewardRisk')))) {
     return { errors: { entry: '数值超出可计算范围，请调整资金或价格' }, result: null, direction };
   }
   return { errors, result, direction };
